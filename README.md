@@ -41,9 +41,9 @@ PartitioningDiff:
 ### Testing
 
 * Move the trained models into the folder `scripts/trained_model`.
-* run the sampling scripts (`scripts\sample.py`) for the three sub-models in sequence, and optionally adjust the parameters to specify the input conditions. For example:
+* Run the sampling scripts (`scripts\sample.py`) for the three sub-models in sequence, and optionally adjust the parameters to specify the input conditions. For example:
 
-Generates bubble diagrams and floor plans using only the input boundary with entrance, without requiring any additional conditions.
+Generating bubble diagrams and floor plans using only the input boundary with entrance, without requiring any additional conditions:
 ```
     cd node_diff/scripts
     python sample.py --dataset rplan --batch_size 1024 --set_name test --model_path trained_model/b_model300000.pt --num_samples 12002 --support_boundary True --support_conditions '' --support_partial False
