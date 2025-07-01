@@ -219,9 +219,9 @@ def create_argparser():
         model_path='',
         output_dir='../../output/output_json',
         syn_dataset_path='',
-        support_boundary=True,
-        support_conditions='ncsl',
-        support_partial=False
+        support_boundary=True,  # True means boundary-constrained; False means boundary-unconstrained
+        support_conditions='ncsl',  # 'ncsl' means support for condition number, category, size, & location;
+        support_partial=False   # True means support for partial input; False means no support for partial input
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

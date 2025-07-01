@@ -3,17 +3,17 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import argparse
 
-from node_diff import dist_util, logger
-from node_diff.rplan_datasets import load_rplan_data
-from node_diff.resample import create_named_schedule_sampler
-from node_diff.script_util import (
+from partitioning_diff import dist_util, logger
+from partitioning_diff.rplan_datasets import load_rplan_data
+from partitioning_diff.resample import create_named_schedule_sampler
+from partitioning_diff.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
     args_to_dict,
     add_dict_to_argparser,
     update_arg_parser,
 )
-from node_diff.train_util import TrainLoop
+from partitioning_diff.train_util import TrainLoop
 
 
 def main():
@@ -31,7 +31,7 @@ def main():
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
-    if args.dataset =='rplan':
+    if args.dataset=='rplan':
         data = load_rplan_data(
             batch_size=args.batch_size,
             set_name=args.set_name,
@@ -44,7 +44,6 @@ def main():
         assert False
 
     logger.log("training...")
-
     TrainLoop(
         model=model,
         diffusion=diffusion,
@@ -66,7 +65,6 @@ def main():
         support_partial=args.support_partial
     ).run_loop()
 
-
 def create_argparser():
     defaults = dict(
         dataset='',
@@ -82,9 +80,9 @@ def create_argparser():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
-        support_boundary=True,
-        support_conditions='', # '', 'n', 'nc'
-        support_partial=False
+        support_boundary=True,  # True means boundary-constrained; False means boundary-unconstrained
+        support_conditions='ncsla',  # 'ncsl' means support for condition number, category, size, location, & adjacencies;
+        support_partial=False   # True means support for partial input; False means no support for partial input
     )
     parser = argparse.ArgumentParser()
     defaults.update(model_and_diffusion_defaults())
@@ -93,5 +91,4 @@ def create_argparser():
 
 
 if __name__ == "__main__":
-    
     main()

@@ -81,9 +81,9 @@ def create_argparser():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
-        support_boundary=True,
-        support_conditions='ncsl',
-        support_partial=False
+        support_boundary=True,  # True means boundary-constrained; False means boundary-unconstrained
+        support_conditions='ncsl',  # 'ncsl' means support for condition number, category, size, & location;
+        support_partial=False   # True means support for partial input; False means no support for partial input
     )
     parser = argparse.ArgumentParser()
     defaults.update(model_and_diffusion_defaults())
