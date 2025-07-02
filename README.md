@@ -21,18 +21,13 @@ IEEE Transactions on Visualization and Computer Graphics, xx(x): 1-17, 2025. (**
 
 ### Training
 
-* We provide separate training scripts (`scripts\train.py`) for the three sub-models (NodeDiff, AdjacencyDiff, \& PartitioningDiff). You can adjust the parameters to determine which conditions each model supports. For example: 
-
-NodeDiff:
+* We provide separate training scripts (`scripts\train.py`) for the three sub-models (NodeDiff, AdjacencyDiff, \& PartitioningDiff). You can adjust the parameters to determine which conditions each model supports. For example:
 ```
+    cd node_diff/scripts
     python train.py --dataset rplan --batch_size 1024 --set_name train --support_boundary True  --support_conditions '' --support_partial False
-```
-AdjacencyDiff:
-```
+    cd adjacency_diff/scripts
     python train.py --dataset rplan --batch_size 1024 --set_name train --support_boundary True  --support_conditions 'ncsl' --support_partial False
-```
-PartitioningDiff:
-```
+    cd partitioning_diff/scripts
     python train.py --dataset rplan --batch_size 1024 --set_name train --support_boundary True  --support_conditions 'ncsla' --support_partial False
 ```
 
