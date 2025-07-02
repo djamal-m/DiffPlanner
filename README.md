@@ -25,8 +25,10 @@ IEEE Transactions on Visualization and Computer Graphics, xx(x): 1-17, 2025. (**
 ```
     cd node_diff/scripts
     python train.py --dataset rplan --batch_size 1024 --set_name train --support_boundary True  --support_conditions '' --support_partial False
+
     cd adjacency_diff/scripts
     python train.py --dataset rplan --batch_size 1024 --set_name train --support_boundary True  --support_conditions 'ncsl' --support_partial False
+    
     cd partitioning_diff/scripts
     python train.py --dataset rplan --batch_size 1024 --set_name train --support_boundary True  --support_conditions 'ncsla' --support_partial False
 ```
