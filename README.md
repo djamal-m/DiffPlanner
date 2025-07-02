@@ -17,7 +17,7 @@ IEEE Transactions on Visualization and Computer Graphics, xx(x): 1-17, 2025. (**
 ### Dataset
 
 * (Optional) Download the preprocessed RPLAN dataset from [here](https://github.com/HanHan55/Graph2plan/releases/download/data/Data.zip) and place it in the folder `\dataset\dataset_mat`. Then, run `python data_preparation.py` to generate the final dataset in the folder `\dataset\dataset_json`.
-* The dataset used in this paper can also be downloaded from [here](). After downloading, place the dataset in the folder `\dataset\dataset_json`.
+* The dataset used in this paper can also be downloaded from [here](https://github.com/shidong-wang/DiffPlanner/releases/download/dataset/dataset.zip). After downloading, place the dataset in the folder `\dataset\dataset_json`.
 
 ### Training
 
@@ -31,7 +31,7 @@ IEEE Transactions on Visualization and Computer Graphics, xx(x): 1-17, 2025. (**
     python train.py --dataset rplan --batch_size 1024 --set_name train --support_boundary True  --support_conditions 'ncsla' --support_partial False
 ```
 
-* The trained model can be download [here]() for testing.
+* The trained model can be download [here](https://github.com/shidong-wang/DiffPlanner/releases/download/trained_model/trained_model.zip) for testing.
 
 ### Testing
 
