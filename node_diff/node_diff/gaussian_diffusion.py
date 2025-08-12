@@ -801,7 +801,6 @@ class GaussianDiffusion:
             xtalpha = _extract_into_tensor(self.sqrt_recip_alphas_cumprod, t, x_t.shape).permute([0,2,1])
             epsalpha = _extract_into_tensor(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape).permute([0,2,1])
             model_output = model(x_t, self._scale_timesteps(t), xtalpha=xtalpha, epsalpha=epsalpha, **model_kwargs)
-            #model_output_dec = model(x_t, self._scale_timesteps(t), **model_kwargs)
             
             if self.model_var_type in [
                 ModelVarType.LEARNED,
@@ -848,7 +847,7 @@ class GaussianDiffusion:
             else:
                 terms["loss"] = terms["mse"]
 
-            terms["loss"] += terms["alignment"]
+            terms["loss"] = terms["loss"] + terms["alignment"]
             
         else:
             raise NotImplementedError(self.loss_type)
