@@ -2,7 +2,7 @@
 
 [Shidong Wang](https://shidong-wang.github.io) and [Renato Pajarola](https://www.ifi.uzh.ch/en/vmml/people/current-staff/pajarola.html)
 
-IEEE Transactions on Visualization and Computer Graphics, xx(x): 1-17, 2025. (**TVCG**)
+IEEE Transactions on Visualization and Computer Graphics, 31(10): 7906-7922, 2025. (**TVCG**)
 
 ![Paper Image](./DiffPlanner.png)
 
@@ -68,9 +68,9 @@ Please cite our paper if you find it useful:
   journal = {IEEE Transactions on Visualization and Computer Graphics}, 
   title = {Eliminating Rasterization: Direct Vector Floor Plan Generation with DiffPlanner}, 
   year = {2025},
-  volume = {},
-  number = {},
-  pages = {1-17},
+  volume = {31},
+  number = {10},
+  pages = {7906-7922},
   doi = {10.1109/TVCG.2025.3559682}
   }
 ```
