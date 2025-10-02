@@ -829,7 +829,7 @@ def main(data_json, support_boundary=True):
     if support_boundary:
         boxes_aligned, order, room_boundaries = align_fp(data_mat['boundary'], data_mat['boxes'], data_mat['types'], data_mat['edges'], threshold = 18)
     else:
-        boxes_aligned, order, room_boundaries, boundary_aligned = align_fp_woboundary(data_mat['boxes'], data_mat['types'], data_mat['edges'], threshold = 18)
+        boxes_aligned, order, room_boundaries, boundary_aligned = align_fp_woboundary(data_mat['boxes'], data_mat['types'], data_mat['edges'], threshold = 12)
     
     boxes_aligned_yxyx = (boxes_aligned[:,[1,0,3,2]]).astype(int)
     edges_aligned = np.array(get_adjancenies_from_boxes(boxes_aligned_yxyx), dtype=np.int32)
