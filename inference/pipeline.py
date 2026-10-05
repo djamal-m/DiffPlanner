@@ -92,8 +92,11 @@ def _load_model(factory, defaults, checkpoint: str, stage: str):
 
 
 def _sample(diffusion, model, channels: int, kwargs: dict, device: torch.device) -> torch.Tensor:
-    kwargs["atten_mask"] = torch.zeros((1, MAX_ROOMS, MAX_ROOMS), device=device)
-    kwargs["padding_mask"] = torch.zeros((1, MAX_ROOMS), device=device)
+    # Sampling calls the model with is_syn=True; all model conditions must use
+    # the syn_ names used by the repository's test Dataset and sample scripts.
+    kwargs = {f"syn_{key}": value for key, value in kwargs.items()}
+    kwargs.setdefault("syn_atten_mask", torch.zeros((1, MAX_ROOMS, MAX_ROOMS), device=device))
+    kwargs.setdefault("syn_padding_mask", torch.zeros((1, MAX_ROOMS), device=device))
     x = torch.randn((1, channels, MAX_ROOMS), device=device)
     with torch.inference_mode():
         return diffusion.p_sample_loop(model, x.shape, noise=x, clip_denoised=True, model_kwargs=kwargs)
