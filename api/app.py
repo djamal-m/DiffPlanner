@@ -44,7 +44,7 @@ def _gui_generate(boundary_text: str, entrance_text: str, num_results: int):
     except Exception as exc:
         stack = traceback.format_exc()
         print(stack, flush=True)
-        raise gr.Error(f"{exc}\n\nFull traceback (also printed to the server log):\n{stack}") from exc
+        return [], [], [], "", stack
 
 
 with gr.Blocks(title="DiffPlanner") as demo:
@@ -58,6 +58,7 @@ with gr.Blocks(title="DiffPlanner") as demo:
         stage2=gr.Gallery(label="Stage 2 · Adjacencies")
         stage3=gr.Gallery(label="Stage 3 · Aligned floor plans")
     details=gr.Code(label="Generated floor-plan data", language="json")
-    button.click(_gui_generate,[boundary,entrance,num_results],[stage1,stage2,stage3,details])
+    error_details=gr.Code(label="Error details (copy this traceback)", language="python")
+    button.click(_gui_generate,[boundary,entrance,num_results],[stage1,stage2,stage3,details,error_details])
 
 app = gr.mount_gradio_app(app, demo, path="/")
