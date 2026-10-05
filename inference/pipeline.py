@@ -50,8 +50,26 @@ def _point_in_polygon(x: float, y: float, polygon: list[list[int]]) -> bool:
     return inside
 
 
-def _boundary_with_entrance(points: list[list[int]], entrance: list[list[int]]) -> tuple[list[list[int]], int]:
-    """Encode boundary as expected by post_processing: entrance edge first, with orientation in column 3."""
+def _segment_orientation(start: list[int], end: list[int], polygon: list[list[int]]) -> int:
+    midpoint_x = (start[0] + end[0]) / 2
+    midpoint_y = (start[1] + end[1]) / 2
+    if start[1] == end[1]:
+        if _point_in_polygon(midpoint_x, midpoint_y + 0.5, polygon):
+            return 0  # interior is below the horizontal edge
+        if _point_in_polygon(midpoint_x, midpoint_y - 0.5, polygon):
+            return 2  # interior is above
+    elif start[0] == end[0]:
+        if _point_in_polygon(midpoint_x - 0.5, midpoint_y, polygon):
+            return 1  # interior is to the left of the vertical edge
+        if _point_in_polygon(midpoint_x + 0.5, midpoint_y, polygon):
+            return 3  # interior is to the right
+    else:
+        raise ValueError("The current alignment stage requires an orthogonal boundary.")
+    raise ValueError("Could not determine which side of a boundary edge is inside the polygon.")
+
+
+def _boundary_with_entrance(points: list[list[int]], entrance: list[list[int]]) -> tuple[list[list[int]], list[int]]:
+    """Order an orthogonal boundary with the entrance first and encode each edge orientation."""
     if points[0] == points[-1]:
         points = points[:-1]
     ring: list[list[int]] = []
@@ -76,26 +94,11 @@ def _boundary_with_entrance(points: list[list[int]], entrance: list[list[int]]) 
     else:
         raise ValueError("Entrance endpoints must form one straight segment along a boundary edge.")
 
-    midpoint_x = (entrance[0][0] + entrance[1][0]) / 2
-    midpoint_y = (entrance[0][1] + entrance[1][1]) / 2
-    if entrance[0][1] == entrance[1][1]:
-        if _point_in_polygon(midpoint_x, midpoint_y + 0.5, points):
-            orientation = 0  # interior is below the horizontal entrance
-        elif _point_in_polygon(midpoint_x, midpoint_y - 0.5, points):
-            orientation = 2  # interior is above
-        else:
-            raise ValueError("Could not determine which side of the entrance is inside the boundary.")
-    elif entrance[0][0] == entrance[1][0]:
-        if _point_in_polygon(midpoint_x - 0.5, midpoint_y, points):
-            orientation = 1  # interior is to the left of the vertical entrance
-        elif _point_in_polygon(midpoint_x + 0.5, midpoint_y, points):
-            orientation = 3  # interior is to the right
-        else:
-            raise ValueError("Could not determine which side of the entrance is inside the boundary.")
-    else:
-        raise ValueError("Entrance endpoints must form a horizontal or vertical segment.")
-
-    return ordered, orientation
+    orientations = [
+        _segment_orientation(ordered[i], ordered[(i + 1) % len(ordered)], points)
+        for i in range(len(ordered))
+    ]
+    return ordered, orientations
 
 
 def _user_record(boundary: list[list[int]], entrance: list[list[int]]) -> dict:
@@ -117,8 +120,9 @@ def _user_record(boundary: list[list[int]], entrance: list[list[int]]) -> dict:
         entrance_expand = [[x0,y-8],[x1,y-8],[x1,y+8],[x0,y+8]]
     else:
         raise ValueError("Entrance endpoints must form a horizontal or vertical segment.")
-    raw_boundary, door_orientation = _boundary_with_entrance(pts.tolist(), ent.tolist())
-    boundary_for_model = [[x, y, door_orientation] for x, y in raw_boundary]
+    raw_boundary, edge_orientations = _boundary_with_entrance(pts.tolist(), ent.tolist())
+    # post_processing.find_close_seg expects [x, y, edge_orientation, is_new].
+    boundary_for_model = [[x, y, orientation, 0] for (x, y), orientation in zip(raw_boundary, edge_orientations)]
     return {"name":"user_floorplan", "boundary":boundary_for_model, "boundary_expand":_expand_polygon(raw_boundary), "entrance_expand":entrance_expand}
 
 
