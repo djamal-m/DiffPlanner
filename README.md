@@ -55,6 +55,31 @@ Generating bubble diagrams and floor plans using only the input boundary with en
 * Navigate to `/output`, and run `python post_processing.py` to get the aligned floor plans.
 * Run `python visualization.py`, and then you can obtain the rasterized color bubble diagrams & floor plans in folder `output/output_vis`.
 
+### Inference application
+
+The FastAPI service and embedded Gradio UI run from the repository root:
+
+```bash
+pip install -r requirements-app.txt
+python run_app.py
+```
+
+Open `http://localhost:8000`. Supply a polygon as `[x, y]` vertices and the
+entrance as two `[x, y]` endpoints on one horizontal or vertical edge. These
+coordinates use the model's 256 × 256 canvas. The UI displays the NodeDiff room
+bubbles, AdjacencyDiff connections, and PartitioningDiff aligned floor plan.
+
+The app expects the three boundary-conditioned checkpoints documented in the
+sampling section. Defaults point to the repository's conventional
+`scripts/trained_model` filenames; override them with
+`DIFFPLANNER_NODE_CHECKPOINT`, `DIFFPLANNER_ADJACENCY_CHECKPOINT`, and
+`DIFFPLANNER_PARTITION_CHECKPOINT`. The weights are not included here, so
+generation reports which configured file is missing until you provide them.
+The model's diffusion sampler supports distinct random samples, so the UI exposes
+1–5 results. The JSON API is `POST /generate` with `{"boundary": [[x,y], ...],
+"entrance": [[x,y],[x,y]], "num_results": 1}`; `/health` reports whether the
+weights were loaded.
+
 ### Acknowledgement
 * Original RPLAN dataset: http://staff.ustc.edu.cn/~fuxm/projects/DeepLayout/index.html
 * Preprocessed RPLAN dataset: https://github.com/HanHan55/Graph2plan

@@ -1,0 +1,12 @@
+# Install in the same environment used for the model's existing dependencies.
+fastapi
+gradio
+uvicorn
+torch
+numpy
+pillow
+opencv-python
+shapely
+scipy
+blobfile
+mpi4py
