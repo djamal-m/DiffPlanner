@@ -34,6 +34,70 @@ def _expand_polygon(points: list[list[int]], size: int = 40) -> list[list[int]]:
     return points
 
 
+def _point_on_segment(point: list[int], start: list[int], end: list[int]) -> bool:
+    cross = (point[0] - start[0]) * (end[1] - start[1]) - (point[1] - start[1]) * (end[0] - start[0])
+    return cross == 0 and min(start[0], end[0]) <= point[0] <= max(start[0], end[0]) and min(start[1], end[1]) <= point[1] <= max(start[1], end[1])
+
+
+def _point_in_polygon(x: float, y: float, polygon: list[list[int]]) -> bool:
+    inside = False
+    j = len(polygon) - 1
+    for i, (xi, yi) in enumerate(polygon):
+        xj, yj = polygon[j]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+            inside = not inside
+        j = i
+    return inside
+
+
+def _boundary_with_entrance(points: list[list[int]], entrance: list[list[int]]) -> tuple[list[list[int]], int]:
+    """Encode boundary as expected by post_processing: entrance edge first, with orientation in column 3."""
+    if points[0] == points[-1]:
+        points = points[:-1]
+    ring: list[list[int]] = []
+    for i, start in enumerate(points):
+        end = points[(i + 1) % len(points)]
+        ring.append(start)
+        inserted = [p for p in entrance if p != start and p != end and _point_on_segment(p, start, end)]
+        inserted.sort(key=lambda p: (p[0] - start[0]) ** 2 + (p[1] - start[1]) ** 2)
+        ring.extend(inserted)
+
+    for endpoint in entrance:
+        if endpoint not in ring:
+            raise ValueError("Both entrance endpoints must lie on the supplied boundary.")
+    if entrance[0] == entrance[1]:
+        raise ValueError("Entrance endpoints must be distinct.")
+
+    start_index = ring.index(entrance[0])
+    if ring[(start_index + 1) % len(ring)] == entrance[1]:
+        ordered = ring[start_index:] + ring[:start_index]
+    elif ring[(start_index - 1) % len(ring)] == entrance[1]:
+        ordered = [ring[(start_index - i) % len(ring)] for i in range(len(ring))]
+    else:
+        raise ValueError("Entrance endpoints must form one straight segment along a boundary edge.")
+
+    midpoint_x = (entrance[0][0] + entrance[1][0]) / 2
+    midpoint_y = (entrance[0][1] + entrance[1][1]) / 2
+    if entrance[0][1] == entrance[1][1]:
+        if _point_in_polygon(midpoint_x, midpoint_y + 0.5, points):
+            orientation = 0  # interior is below the horizontal entrance
+        elif _point_in_polygon(midpoint_x, midpoint_y - 0.5, points):
+            orientation = 2  # interior is above
+        else:
+            raise ValueError("Could not determine which side of the entrance is inside the boundary.")
+    elif entrance[0][0] == entrance[1][0]:
+        if _point_in_polygon(midpoint_x - 0.5, midpoint_y, points):
+            orientation = 1  # interior is to the left of the vertical entrance
+        elif _point_in_polygon(midpoint_x + 0.5, midpoint_y, points):
+            orientation = 3  # interior is to the right
+        else:
+            raise ValueError("Could not determine which side of the entrance is inside the boundary.")
+    else:
+        raise ValueError("Entrance endpoints must form a horizontal or vertical segment.")
+
+    return ordered, orientation
+
+
 def _user_record(boundary: list[list[int]], entrance: list[list[int]]) -> dict:
     if len(boundary) < 3:
         raise ValueError("Boundary must contain at least three [x, y] points.")
@@ -42,9 +106,6 @@ def _user_record(boundary: list[list[int]], entrance: list[list[int]]) -> dict:
     pts = np.asarray(boundary, dtype=int)
     if np.any(pts <= 0) or np.any(pts >= CANVAS):
         raise ValueError("Boundary coordinates must be strictly between 0 and 256, matching the training data.")
-    if not (np.all(pts[:, 0] == pts[0, 0]) or np.all(pts[:, 1] == pts[0, 1])):
-        # The repository supports polygon boundaries; only the entrance is axis aligned.
-        pass
     ent = np.asarray(entrance, dtype=int)
     if not (np.all(ent > 0) and np.all(ent < CANVAS)):
         raise ValueError("Entrance coordinates must be strictly between 0 and 256.")
@@ -56,7 +117,9 @@ def _user_record(boundary: list[list[int]], entrance: list[list[int]]) -> dict:
         entrance_expand = [[x0,y-8],[x1,y-8],[x1,y+8],[x0,y+8]]
     else:
         raise ValueError("Entrance endpoints must form a horizontal or vertical segment.")
-    return {"name":"user_floorplan", "boundary":pts.tolist(), "boundary_expand":_expand_polygon(pts.tolist()), "entrance_expand":entrance_expand}
+    raw_boundary, door_orientation = _boundary_with_entrance(pts.tolist(), ent.tolist())
+    boundary_for_model = [[x, y, door_orientation] for x, y in raw_boundary]
+    return {"name":"user_floorplan", "boundary":boundary_for_model, "boundary_expand":_expand_polygon(raw_boundary), "entrance_expand":entrance_expand}
 
 
 def _conditions(record: dict, device: torch.device) -> dict:
