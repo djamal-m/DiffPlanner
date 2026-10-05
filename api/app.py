@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import traceback
 import gradio as gr
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -41,7 +42,9 @@ def _gui_generate(boundary_text: str, entrance_text: str, num_results: int):
         def image(blob): return Image.open(io.BytesIO(blob)).copy()
         return [image(r["stage1"]) for r in results],[image(r["stage2"]) for r in results],[image(r["stage3"]) for r in results],json.dumps([r["data"] for r in results],indent=2)
     except Exception as exc:
-        raise gr.Error(str(exc)) from exc
+        stack = traceback.format_exc()
+        print(stack, flush=True)
+        raise gr.Error(f"{exc}\n\nFull traceback (also printed to the server log):\n{stack}") from exc
 
 
 with gr.Blocks(title="DiffPlanner") as demo:
