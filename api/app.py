@@ -40,7 +40,7 @@ def _gui_generate(boundary_text: str, entrance_text: str, num_results: int):
         from PIL import Image
         import io
         def image(blob): return Image.open(io.BytesIO(blob)).copy()
-        return [image(r["stage1"]) for r in results],[image(r["stage2"]) for r in results],[image(r["stage3"]) for r in results],json.dumps([r["data"] for r in results],indent=2)
+        return [image(r["stage1"]) for r in results],[image(r["stage2"]) for r in results],[image(r["stage3"]) for r in results],json.dumps([r["data"] for r in results],indent=2),""
     except Exception as exc:
         stack = traceback.format_exc()
         print(stack, flush=True)
