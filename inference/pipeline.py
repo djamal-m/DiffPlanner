@@ -99,7 +99,14 @@ def _sample(diffusion, model, channels: int, kwargs: dict, device: torch.device)
     kwargs.setdefault("syn_padding_mask", torch.zeros((1, MAX_ROOMS), device=device))
     x = torch.randn((1, channels, MAX_ROOMS), device=device)
     with torch.inference_mode():
-        return diffusion.p_sample_loop(model, x.shape, noise=x, clip_denoised=True, model_kwargs=kwargs)
+        samples = diffusion.p_sample_loop(model, x.shape, noise=x, clip_denoised=True, model_kwargs=kwargs)
+    # This repository's p_sample_loop returns the final denoising frames as
+    # [frames, batch, channels, rooms]; the original sample scripts select [-1].
+    if samples.ndim == 4:
+        samples = samples[-1]
+    if samples.ndim != 3:
+        raise RuntimeError(f"Expected a [batch, channels, rooms] sample, got shape {tuple(samples.shape)}")
+    return samples
 
 
 def _decode_nodes(tensor: torch.Tensor, record: dict) -> dict:
