@@ -136,16 +136,18 @@ def _conditions(record: dict, device: torch.device) -> dict:
     }
 
 
-def _load_model(factory, defaults, checkpoint: str, stage: str):
+def _load_model(factory, defaults, checkpoint: str, stage: str, node_mode: str = "b"):
     config = defaults()
     config.update(dataset="rplan", support_boundary=True, support_partial=False)
     # Training scripts call update_arg_parser(), which sets this to 512.
     config["num_channels"] = 512
-    if stage == "node": config["support_conditions"] = ""
+    if stage == "node": config["support_conditions"] = {"b": "", "n": "n", "nc": "nc"}[node_mode]
     elif stage == "adjacency": config["support_conditions"] = "ncsl"
     else: config["support_conditions"] = "ncsla"
     config["set_name"] = "test"
-    if stage == "node": config.update(input_channels=5, out_channels=5)
+    if stage == "node":
+        channels = {"b": 5, "n": 4, "nc": 3}[node_mode]
+        config.update(input_channels=channels, out_channels=channels)
     elif stage == "adjacency": config.update(input_channels=8, out_channels=8)
     else: config.update(input_channels=4, out_channels=4)
     model, diffusion = factory(**config)
@@ -187,6 +189,51 @@ def _decode_nodes(tensor: torch.Tensor, record: dict) -> dict:
     return {**record, "rooms":rooms}
 
 
+def _node_conditions(mode: str, room_count: int | None, categories: list[int] | None, device: torch.device) -> tuple[dict, int]:
+    channels = {"b": 5, "n": 4, "nc": 3}[mode]
+    number = np.zeros((MAX_ROOMS, MAX_ROOMS), dtype=np.float32)
+    category = np.zeros((MAX_ROOMS, 6), dtype=np.float32)
+    attention = np.zeros((MAX_ROOMS, MAX_ROOMS), dtype=np.float32)
+    padding = np.zeros(MAX_ROOMS, dtype=np.float32)
+    if mode in ("n", "nc"):
+        count = int(room_count)
+        for i in range(count):
+            number[i, i] = 1
+        attention.fill(1)
+        attention[:count, :count] = 0
+        padding[count:] = 1
+    if mode == "nc":
+        for i, room_category in enumerate(categories):
+            category[i, room_category] = 1
+    cond = {
+        "cond_number": torch.tensor(number[None], device=device),
+        "cond_category": torch.tensor(category[None], device=device),
+        "atten_mask": torch.tensor(attention[None], device=device),
+        "padding_mask": torch.tensor(padding[None], device=device),
+        "cond_partial": torch.full((1, MAX_ROOMS, channels), -1.0, device=device),
+    }
+    return cond, channels
+
+
+def _decode_conditioned_nodes(tensor: torch.Tensor, record: dict, mode: str, room_count: int, categories: list[int] | None) -> dict:
+    a = tensor[0].permute(1, 0).detach().cpu().numpy()
+    rooms = []
+    for i, row in enumerate(a[:room_count]):
+        if mode == "n":
+            category = int(np.clip(round(((row[0] + 1) / 2) * 6) - 1, 0, 5))
+            size_value, location_value = row[1], row[2:4]
+        else:
+            category = int(categories[i])
+            size_value, location_value = row[0], row[1:3]
+        rooms.append({
+            "id": i,
+            "category": category,
+            "size": int(round(((size_value + 1) / 2) * CANVAS * CANVAS)),
+            "location": np.round(((location_value + 1) / 2) * CANVAS).astype(int).tolist(),
+        })
+    return {**record, "rooms": rooms}
+
+
 def _room_conditions(data: dict, device: torch.device):
     rooms = data["rooms"]; n=len(rooms); area=CANVAS*CANVAS
     number=np.zeros((MAX_ROOMS,MAX_ROOMS),np.float32)
@@ -214,41 +261,65 @@ def _decode_adjacencies(tensor: torch.Tensor, data: dict) -> dict:
 
 class FloorPlanInference:
     def __init__(self, checkpoints: dict[str,str] | None = None):
-        self.checkpoints = checkpoints or {
-            "node":os.getenv("DIFFPLANNER_NODE_CHECKPOINT", str(ROOT/"node_diff/scripts/trained_model/b_model300000.pt")),
-            "adjacency":os.getenv("DIFFPLANNER_ADJACENCY_CHECKPOINT", str(ROOT/"adjacency_diff/scripts/trained_model/bncsl_model300000.pt")),
-            "partition":os.getenv("DIFFPLANNER_PARTITION_CHECKPOINT", str(ROOT/"partitioning_diff/scripts/trained_model/bncsla_model300000.pt")),
+        overrides = checkpoints or {}
+        self.checkpoints = {
+            "node_b": overrides.get("node_b", overrides.get("node", os.getenv("DIFFPLANNER_NODE_CHECKPOINT", str(ROOT/"node_diff/scripts/trained_model/b_model300000.pt")))),
+            "node_n": overrides.get("node_n", os.getenv("DIFFPLANNER_NODE_N_CHECKPOINT", str(ROOT/"node_diff/scripts/trained_model/bn_model300000.pt"))),
+            "node_nc": overrides.get("node_nc", os.getenv("DIFFPLANNER_NODE_NC_CHECKPOINT", str(ROOT/"node_diff/scripts/trained_model/bnc_model300000.pt"))),
+            "adjacency":overrides.get("adjacency", os.getenv("DIFFPLANNER_ADJACENCY_CHECKPOINT", str(ROOT/"adjacency_diff/scripts/trained_model/bncsl_model300000.pt"))),
+            "partition":overrides.get("partition", os.getenv("DIFFPLANNER_PARTITION_CHECKPOINT", str(ROOT/"partitioning_diff/scripts/trained_model/bncsla_model300000.pt"))),
         }
-        self.models = None
+        self.models = {}
 
-    def _initialize(self):
-        if self.models is not None: return
-        for stage, path in self.checkpoints.items():
+    def _initialize(self, node_mode: str):
+        node_key = f"node_{node_mode}"
+        for stage, path in ((node_key, self.checkpoints[node_key]), ("adjacency", self.checkpoints["adjacency"]), ("partition", self.checkpoints["partition"])):
             if not Path(path).is_file():
                 raise FileNotFoundError(f"Missing {stage} checkpoint: {path}. Set DIFFPLANNER_{stage.upper()}_CHECKPOINT to its location.")
-        self.models = (
-            _load_model(make_node,node_defaults,self.checkpoints['node'],'node'),
-            _load_model(make_adjacency,adjacency_defaults,self.checkpoints['adjacency'],'adjacency'),
-            _load_model(make_partition,partition_defaults,self.checkpoints['partition'],'partition'),
-        )
+        for loaded_node in [key for key in self.models if key.startswith("node_") and key != node_key]:
+            del self.models[loaded_node]
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        if node_key not in self.models:
+            self.models[node_key] = _load_model(make_node, node_defaults, self.checkpoints[node_key], "node", node_mode)
+        if "adjacency" not in self.models:
+            self.models["adjacency"] = _load_model(make_adjacency, adjacency_defaults, self.checkpoints["adjacency"], "adjacency")
+        if "partition" not in self.models:
+            self.models["partition"] = _load_model(make_partition, partition_defaults, self.checkpoints["partition"], "partition")
+        return self.models[node_key], self.models["adjacency"], self.models["partition"]
 
-    def generate(self, boundary: list[list[int]], entrance: list[list[int]], num_results: int = 1) -> list[dict]:
+    def generate(self, boundary: list[list[int]], entrance: list[list[int]], num_results: int = 1,
+                 node_mode: str = "b", room_count: int | None = None,
+                 room_categories: list[int] | None = None) -> list[dict]:
         if not 1 <= int(num_results) <= 5:
             raise ValueError("Number of results must be between 1 and 5.")
-        return [self._generate_one(boundary, entrance) for _ in range(int(num_results))]
+        if node_mode not in ("b", "n", "nc"):
+            raise ValueError("NodeDiff mode must be 'b', 'n', or 'nc'.")
+        if node_mode in ("n", "nc") and (room_count is None or not 1 <= int(room_count) <= MAX_ROOMS):
+            raise ValueError(f"NodeDiff mode {node_mode} requires a room count from 1 to {MAX_ROOMS}.")
+        if node_mode == "nc" and (room_categories is None or len(room_categories) != int(room_count)):
+            raise ValueError("NodeDiff mode nc requires one category for each room.")
+        if node_mode == "nc":
+            if any(type(c) is not int or c < 0 or c > 5 for c in room_categories):
+                raise ValueError("Room categories must be integer IDs from 0 to 5.")
+        return [self._generate_one(boundary, entrance, node_mode, room_count, room_categories) for _ in range(int(num_results))]
 
-    def _generate_one(self, boundary: list[list[int]], entrance: list[list[int]]) -> dict:
+    def _generate_one(self, boundary: list[list[int]], entrance: list[list[int]], node_mode: str,
+                      room_count: int | None, room_categories: list[int] | None) -> dict:
         record=_user_record(boundary,entrance)
-        self._initialize()
+        nm, ad, pm = self._initialize(node_mode)
         from output.post_processing import main as align_plan
         from output.visualization import draw_bubble, vis_floorplan
         from PIL import Image
         import io
-        nm,ad,pm=self.models
         nmodel,ndiff,device=nm; amodel,adiff,_=ad; pmodel,pdiff,_=pm
         common=_conditions(record,device)
-        node=_sample(ndiff,nmodel,5,{**common,"cond_category":torch.zeros((1,MAX_ROOMS,6),device=device),"cond_partial":torch.full((1,MAX_ROOMS,5),-1.,device=device)},device)
-        data1=_decode_nodes(node,record)
+        node_cond, node_channels = _node_conditions(node_mode, room_count, room_categories, device)
+        node=_sample(ndiff,nmodel,node_channels,{**common,**node_cond},device)
+        if node_mode == "b":
+            data1=_decode_nodes(node,record)
+        else:
+            data1=_decode_conditioned_nodes(node,record,node_mode,int(room_count),room_categories)
         nc=_room_conditions(data1,device)
         adj=_sample(adiff,amodel,8,{**common,**nc,"cond_partial":torch.full((1,MAX_ROOMS,MAX_ROOMS),-1.,device=device)},device)
         data2=_decode_adjacencies(adj,data1)

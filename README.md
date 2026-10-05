@@ -69,12 +69,21 @@ entrance as two `[x, y]` endpoints on one horizontal or vertical edge. These
 coordinates use the model's 256 × 256 canvas. The UI displays the NodeDiff room
 bubbles, AdjacencyDiff connections, and PartitioningDiff aligned floor plan.
 
-The app expects the three boundary-conditioned checkpoints documented in the
-sampling section. Defaults point to the repository's conventional
-`scripts/trained_model` filenames; override them with
+Choose a NodeDiff mode: `b` generates room count and attributes from the
+boundary; `bn` takes a room count and generates room categories, sizes, and
+locations; `bnc` takes a room count and ordered category IDs (0 living room, 1
+bedroom, 2 kitchen, 3 bathroom, 4 balcony, 5 storage) and generates sizes and
+locations. The latter modes require compatible NodeDiff checkpoints. Set
+`DIFFPLANNER_NODE_N_CHECKPOINT` for `bn` and `DIFFPLANNER_NODE_NC_CHECKPOINT`
+for `bnc`; if those weights are not available, selecting the mode reports which
+checkpoint is missing.
+
+The default app checkpoints are the boundary-only NodeDiff model and the
+`ncsl`/`ncsla` adjacency and partitioning models. Override their paths with
 `DIFFPLANNER_NODE_CHECKPOINT`, `DIFFPLANNER_ADJACENCY_CHECKPOINT`, and
-`DIFFPLANNER_PARTITION_CHECKPOINT`. The weights are not included here, so
-generation reports which configured file is missing until you provide them.
+`DIFFPLANNER_PARTITION_CHECKPOINT`. The release archive may not include the
+optional `bn` and `bnc` variants; selecting one without its weights reports the
+missing path.
 The model's diffusion sampler supports distinct random samples, so the UI exposes
 1–5 results. The JSON API is `POST /generate` with `{"boundary": [[x,y], ...],
 "entrance": [[x,y],[x,y]], "num_results": 1}`; `/health` reports whether the
